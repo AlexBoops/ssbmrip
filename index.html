@@ -1,9 +1,33 @@
 <!doctype html>
-<html lang="en"><script>(function(){try{if(window.__nfAudioHook)return;var AC=window.AudioContext||window.webkitAudioContext;if(!AC||!window.AudioNode)return;window.__nfAudioHook=true;window.__nfAudioStreams=window.__nfAudioStreams||[];var ensureTap=function(c){if(!c.__nfTap){c.__nfTap=c.createMediaStreamDestination();window.__nfAudioStreams.push(c.__nfTap.stream);}return c.__nfTap;};var oc=window.AudioNode.prototype.connect;window.AudioNode.prototype.connect=function(d){var r=oc.apply(this,arguments);try{var c=this.context;if(c&&d===c.destination)oc.call(this,ensureTap(c));}catch(e){}return r;};var wrap=function(C){var P=function(){var c=Reflect.construct(C,arguments,P);try{ensureTap(c);}catch(e){}return c;};P.prototype=C.prototype;return P;};if(window.AudioContext)window.AudioContext=wrap(window.AudioContext);if(window.webkitAudioContext)window.webkitAudioContext=wrap(window.webkitAudioContext);}catch(e){}})();</script>
-<head><script>(function(){try{if(window.__nfAudioHook)return;var AC=window.AudioContext||window.webkitAudioContext;if(!AC||!window.AudioNode)return;window.__nfAudioHook=true;window.__nfAudioStreams=window.__nfAudioStreams||[];var ensureTap=function(c){if(!c.__nfTap){c.__nfTap=c.createMediaStreamDestination();window.__nfAudioStreams.push(c.__nfTap.stream);}return c.__nfTap;};var oc=window.AudioNode.prototype.connect;window.AudioNode.prototype.connect=function(d){var r=oc.apply(this,arguments);try{var c=this.context;if(c&&d===c.destination)oc.call(this,ensureTap(c));}catch(e){}return r;};var wrap=function(C){var P=function(){var c=Reflect.construct(C,arguments,P);try{ensureTap(c);}catch(e){}return c;};P.prototype=C.prototype;return P;};if(window.AudioContext)window.AudioContext=wrap(window.AudioContext);if(window.webkitAudioContext)window.webkitAudioContext=wrap(window.webkitAudioContext);}catch(e){}})();</script>
+<html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Super Smash Bros. Melee</title>
+
+<!-- Service Worker Registration for COOP/COEP Threading -->
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then((registration) => {
+      if (registration.active && !window.crossOriginIsolated) {
+        window.location.reload();
+      }
+      registration.addEventListener('updatefound', () => {
+        const installing = registration.installing;
+        if (installing) {
+          installing.addEventListener('statechange', () => {
+            if (installing.state === 'activated' && !window.crossOriginIsolated) {
+              window.location.reload();
+            }
+          });
+        }
+      });
+    }).catch((err) => {
+      console.error('Service Worker registration failed:', err);
+    });
+  }
+</script>
+
 <style>
   :root {
     --bg: #05070d; --fg: #e8ecf6; --dim: #8c96b3; --accent: #2f6fff; --accent-2: #5a8cff;
@@ -14,16 +38,11 @@
     font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
   button { font: inherit; color: inherit; cursor: pointer; }
 
-  /* The game fills the window at 4:3 (letterboxed). */
   #screen { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; }
-  /* The game's frames are not 4:3 in pixels (e.g. 640x528): stretch them into the largest 4:3 box. */
-  #display, #intro { width: min(100vw, calc(100vh * 4 / 3)); height: min(100vh, calc(100vw * 3 / 4)); display: block;
-    outline: none; }
-  /* GameCube startup screen, played before the game starts. */
+  #display, #intro { width: min(100vw, calc(100vh * 4 / 3)); height: min(100vh, calc(100vw * 3 / 4)); display: block; outline: none; }
   #intro { position: absolute; object-fit: contain; background: #000; }
   #intro[hidden] { display: none; }
 
-  /* Start / loading screen. */
   #overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     background: radial-gradient(ellipse at center, #10183a 0%, #05070d 70%); padding: 24px; }
   #overlay.hidden { display: none; }
@@ -40,14 +59,13 @@
   #start-hint.hidden { display: none; }
   @keyframes pulse { 50% { opacity: .65; } }
 
-  /* Settings button: top right, fades out while the mouse is still during play. */
   #gear { position: fixed; top: 14px; right: 14px; z-index: 5; width: 42px; height: 42px; border-radius: 50%;
     border: 1px solid var(--line); background: rgba(10, 14, 28, .7); display: grid; place-items: center;
     transition: opacity .4s; }
   #gear:hover { background: rgba(30, 40, 75, .9); }
   body.idle #gear { opacity: 0; }
   #gear svg { width: 22px; height: 22px; fill: var(--fg); }
-  /* Pause button, left of the gear. */
+
   #pause { position: fixed; top: 14px; right: 64px; z-index: 5; width: 42px; height: 42px; border-radius: 50%;
     border: 1px solid var(--line); background: rgba(10, 14, 28, .7); display: grid; place-items: center;
     transition: opacity .4s; }
@@ -57,7 +75,13 @@
   #pause .play, #pause.paused .bars { display: none; }
   #pause.paused .play { display: block; }
 
-  /* Settings panel. */
+  #cloak-btn { position: fixed; top: 14px; right: 114px; z-index: 5; height: 42px; padding: 0 14px;
+    border-radius: 999px; border: 1px solid var(--line); background: rgba(10, 14, 28, .7);
+    color: var(--fg); font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px;
+    transition: opacity .4s, background .2s; }
+  #cloak-btn:hover { background: rgba(30, 40, 75, .9); }
+  body.idle #cloak-btn { opacity: 0; }
+
   #settings { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
     background: rgba(0, 0, 0, .55); }
   #settings.hidden { display: none; }
@@ -84,8 +108,7 @@
   .pick { max-width: 300px; padding: 6px 8px; border-radius: 7px; border: 1px solid var(--line);
     background: var(--key); color: var(--fg); font: inherit; font-size: 13px; }
   .check { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--dim); white-space: nowrap; }
-  /* FPS counter: top right, left of the settings button. */
-  #fps { position: fixed; top: 18px; right: 116px; z-index: 5; padding: 4px 10px; border-radius: 8px;
+  #fps { position: fixed; top: 18px; right: 245px; z-index: 5; padding: 4px 10px; border-radius: 8px;
     background: rgba(0, 0, 0, .55); color: #7dff8a; font: 600 15px ui-monospace, Consolas, monospace;
     pointer-events: none; }
   #fps.hidden { display: none; }
@@ -104,7 +127,6 @@
   .switch input:checked + span { background: var(--accent); }
   .switch input:checked + span::after { transform: translateX(20px); }
 
-  /* Info bar: status and the game's log, shown only when enabled in the settings. */
   #infobar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 4; max-height: 32vh; display: flex;
     flex-direction: column; background: rgba(5, 8, 18, .82); border-top: 1px solid var(--line); }
   #infobar.hidden { display: none; }
@@ -115,12 +137,9 @@
 </head>
 <body>
   <div id="screen">
-    <!-- frames from the renderer thread are shown here (see sadxPresent in sadx-page.js) -->
     <canvas id="display" width="1280" height="960" tabindex="0"></canvas>
     <video id="intro" src="loading.mp4" preload="auto" playsinline hidden></video>
-    <!-- the renderer draws into this one from its worker thread; it is never shown directly -->
     <canvas id="canvas" width="1280" height="960" hidden></canvas>
-    <!-- given to the wasm main thread so the real canvas stays free for the renderer thread -->
     <canvas id="sadx-main-thread-canvas" width="1" height="1" hidden></canvas>
     <div id="overlay">
       <div class="card">
@@ -132,10 +151,13 @@
     </div>
   </div>
 
+  <button id="cloak-btn" title="Open in About:Blank">🌐 About:Blank</button>
+
   <button id="pause" title="Pause" aria-label="Pause" aria-pressed="false">
     <svg class="bars" viewBox="0 0 24 24"><rect x="6" y="4.5" width="4.2" height="15" rx="1.2"/><rect x="13.8" y="4.5" width="4.2" height="15" rx="1.2"/></svg>
     <svg class="play" viewBox="0 0 24 24"><path d="M8 4.8v14.4a1 1 0 0 0 1.5.86l11.2-7.2a1 1 0 0 0 0-1.72L9.5 3.94A1 1 0 0 0 8 4.8z"/></svg>
   </button>
+
   <button id="gear" title="Settings" aria-label="Settings">
     <svg viewBox="0 0 24 24"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5A3.5 3.5 0 1 1 13 8.5a3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>
   </button>
@@ -179,6 +201,45 @@
     <div id="status"></div>
     <pre id="log"></pre>
   </div>
+
+  <script>
+    // About:Blank Cloaker
+    const abBtn = document.getElementById("cloak-btn");
+    if (window.location.href === "about:blank" || window.origin === "null") {
+      abBtn.style.display = "none";
+    }
+    abBtn.addEventListener("click", function() {
+      try {
+        const win = window.open("about:blank", "_blank");
+        if (!win || win.closed) {
+          alert("Pop-up blocked! Allow pop-ups to open about:blank.");
+          return;
+        }
+        win.document.title = "Google Docs";
+        const link = win.document.createElement("link");
+        link.rel = "icon";
+        link.href = "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico";
+        win.document.head.appendChild(link);
+
+        const iframe = win.document.createElement("iframe");
+        iframe.style.position = "fixed";
+        iframe.style.inset = "0";
+        iframe.style.width = "100%";
+        iframe.style.height = "100%";
+        iframe.style.border = "none";
+        iframe.src = window.location.href;
+        win.document.body.style.margin = "0";
+        win.document.body.style.overflow = "hidden";
+        win.document.body.appendChild(iframe);
+
+        window.location.replace("https://classroom.google.com");
+      } catch (e) {
+        console.warn("About:blank launch blocked:", e);
+      }
+    });
+  </script>
+
+  <!-- Local relative scripts -->
   <script src="ssbm.js"></script>
   <script src="ssbm-page.js"></script>
 </body>
